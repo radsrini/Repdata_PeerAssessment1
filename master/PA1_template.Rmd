@@ -1,0 +1,126 @@
+---
+title: "Assignment1 : Activity monitor"
+---
+
+## Section 1 : Mean total steps per day
+
+```{r setoptions,echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE, results = "asis", fig.path='figure/',fig.width=10, fig.height=8)
+options(scipen = 1, digits = 2)
+```
+
+```{r printMeanMedian,, message=F, warning=F}
+        library(data.table)
+
+        wkout_df <- read.csv("activity.csv",sep=",",stringsAsFactors=FALSE,header=TRUE)
+        wkout_dt <- data.table(wkout_df)
+
+        # adding the total # of steps by date  
+        sum_dt <- wkout_dt[,sum(steps),by="date"]
+        setnames(sum_dt,"V1","total")
+
+        # creating the histogram
+        hist(sum_dt$total,main="Total Steps Hist", xlab="total steps")
+        mean_total <- mean(sum_dt$total,na.rm=TRUE)
+        median_total <- median(sum_dt$total,na.rm=TRUE)
+```
+
+The mean is `r mean_total`.
+
+The median is `r median_total`.
+
+## Section 2 : Average daily activity pattern
+```{r printMaxmeanInterval}
+        # calculating average steps across all days by time interval
+        mean_dt <- wkout_dt[,mean(steps,na.rm=TRUE),by="interval"]
+        setnames(mean_dt,"V1","mean")
+
+        # plotting a line graph for average steps across days by time interval
+        plot(mean_dt,type="l")
+        axis(side=1, at=seq(0, 288,by=1))
+
+        # fetching the time interval data with maximum average steps
+        dt<- subset(mean_dt,mean_dt$mean==max(mean_dt$mean))
+```
+
+The 5-min interval on average that contains max # of steps is `r  dt$interval`.
+
+
+## Section 3 : Imputing missing values
+```{r imputing data, message=F, warning=F}
+        library(Hmisc,quietly=TRUE)
+
+        nullval <- sum(is.na(wkout_dt$steps))
+
+        mean_dt <- wkout_dt[,mean(steps,na.rm=TRUE),by="date"]
+        setnames(mean_dt,"V1","mean")
+        mean_dt[is.na(mean_dt)] <- 0
+        
+        # merging the daily mean to all the rows
+        m_dt <- merge(wkout_dt, mean_dt, by="date", all.x=TRUE)
+        
+        # imputing the NAs with the mean value
+        for (i in seq(1, nrow(m_dt))) 
+        {
+                if (is.na(m_dt$steps[i])){
+                        m_dt$steps[i] <- m_dt$mean[i]
+                }
+        }
+
+        #adding the total # of steps by date of the imputed data
+        sum_dt <- m_dt[,sum(steps,na.rm=TRUE),by="date"]
+        setnames(sum_dt,"V1","total")
+        print(nrow(sum_dt))
+
+        # creating the histogram of the imputed data
+        hist(sum_dt$total,main="Total Steps Hist (Imputed)", xlab="total steps (imputed)")
+        imp_mean_total <- mean(sum_dt$total,na.rm=TRUE)
+        imp_median_total <- median(sum_dt$total,na.rm=TRUE)
+
+```
+
+'NA' count is `r nullval`.
+
+The imputed mean is `r imp_mean_total`.
+
+The imputed median is `r imp_median_total`.
+
+## Section 4 : Difference in activity patterns
+```{r plottingByWeekend vs  data, message=F, warning=F}
+
+        # populate weekday or weekend based on the date
+        for (i in seq(1, nrow(wkout_dt))) 
+        {
+                day <- as.POSIXlt(as.Date(wkout_dt$date[i]))$wday
+                if (day == 6 || day == 0){
+                        wkout_dt$week[i] <- "weekend"
+                }
+                else{
+                        wkout_dt$week[i] <- "weekday"
+                }
+        }
+        
+        # calculate average steps for both weekend and weekday subset
+        dt<- subset(wkout_dt,wkout_dt$week=="weekday")
+        weekday_dt <- dt[,mean(steps,na.rm=TRUE),by="interval"]
+        setnames(weekday_dt,"V1","mean")
+        for (i in seq(1, nrow(weekday_dt))) 
+        {    
+                weekday_dt$week[i] <- "weekday"
+        }
+        dt<- subset(wkout_dt,wkout_dt$week=="weekend")
+        weekend_dt <- dt[,mean(steps,na.rm=TRUE),by="interval"]
+        setnames(weekend_dt,"V1","mean")
+        for (i in seq(1, nrow(weekend_dt))) 
+        {    
+                weekend_dt$week[i] <- "weekend"
+        }
+        
+        # bind both weekend and weekday data
+        mydt <- rbind(weekday_dt,weekend_dt)
+        plot <- xyplot(mean ~ interval | week, xlab = "interval",data=mydt, layout = c(1, 2),
+                       type = "l",main = "Average Steps by Interval")
+        print(plot, position = c(0, .3, 1, .9), more = TRUE)
+
+
+```
